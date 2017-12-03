@@ -1,21 +1,21 @@
 <?php
 
 /**
- * Sanatizes and compartmentalizes the data for a Lesson.
+ * Sanatizes and compartmentalizes the data for a Test.
  */
-class MK_Lesson {
+class MK_Test {
 
 	protected $id = 0;
-	protected $course_id = 0;
+	protected $parent_id = 0;
 	protected $title = '';
 	protected $description = '';
-	protected $resource_url = '';
-	protected $resource_title = '';
+	protected $questions = [];
+	protected $is_final_exam = false;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param int $id Lesson post ID
+	 * @param int $id Test post ID
 	 */
 	public function __construct( $id = 0 ) {
 		if ( $id ) {
@@ -97,39 +97,67 @@ class MK_Lesson {
 	}
 
 	/**
-	 * Set the resource URL.
+	 * Set the questions.
 	 *
-	 * @param string $url A full link to somewhere.
+	 * @param array $questions Array with following indexes:
+	 *					'text' => string Question text
+	 *					'correct' => string Correct answer
+	 *					'incorrect' => array of strings Incorrect answers
 	 */
-	public function set_resource_url( $url ) {
-		$this->resource_url = esc_url( $url );
+	public function set_questions( $questions ) {
+		$sanitized = array();
+
+		foreach ( $questions as $question ) {
+			$text = isset( $question['text'] ) ? esc_attr( $question['text'] ) : '';
+			if ( ! $text ) {
+				continue;
+			}
+
+			$correct = isset( $question['correct'] ) ? esc_attr( $question['correct'] ) : '';
+			if ( ! $correct ) {
+				continue;
+			}
+
+			$incorrect = isset( $question['incorrect'] ) ? array_map( 'esc_attr', $question['incorrect'] ) : array();
+			if ( empty( $incorrect ) ) {
+				continue;
+			}
+
+			$sanitized[] = [
+				'text' => $text,
+				'correct' => $correct,
+				'incorrect' => $incorrect,
+			];
+		}
+
+		$this->questions = $sanitized;
 	}
 
 	/**
-	 * Get the resource URL.
+	 * Get the questions.
 	 *
-	 * @return string
+	 * @return array See set_questions for format.
 	 */
-	public function get_resource_url() {
-		return $this->resource_url;
+	public function get_questions() {
+		return $this->questions;
 	}
 
 	/**
-	 * Set the resource title.
+	 * Set whether this is a final exam. Final exams behave in special ways.
 	 *
-	 * @param string
+	 * @param bool $is
 	 */
-	public function set_resource_title( $title ) {
-		$this->resource_title = esc_html( $title );
+	public function set_is_final_exam( $is ) {
+		$this->is_final_exam = boolval( $is );
 	}
 
 	/**
-	 * Get the resource title.
+	 * Return whether this is a final exam.
 	 *
-	 * @return string
+	 * @return bool
 	 */
-	public function get_resource_title() {
-		return $this->resource_title;
+	public function is_final_exam() {
+		return $this->is_final_exam;
 	}
 
 	/**
@@ -140,7 +168,7 @@ class MK_Lesson {
 			return;
 		}
 
-		MK_Lessons::load( $this );
+		MK_Tests::load( $this );
 	}
 
 	/**
@@ -151,6 +179,6 @@ class MK_Lesson {
 			return;
 		}
 
-		MK_Lessons::save( $this );
+		MK_Tests::save( $this );
 	}
 }

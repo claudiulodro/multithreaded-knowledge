@@ -1,23 +1,32 @@
 <?php
 
+/**
+ * Manages Courses at a macro level.
+ */
 class MK_Courses {
 
 	const POST_TYPE = 'course';
 	const SEQUENCE_IDS_META = 'mk_sequence_ids';
 
-	// Just save the meta because everything else is saved during normal post save.
+	/**
+	 * Save a Course. This only saves information that isn't managed automatically by WordPress.
+	 *
+	 * @param MK_Course $course
+	 */
 	public static function save( $course ) {
 		$id = $course->get_id();
 		if ( ! $id ) {
 			return;
 		}
 
-		delete_post_meta( $id, self::SEQUENCE_IDS_META );
-		foreach ( $course->get_sequence_ids() as $sequence_id ) {
-			add_post_meta( $id, self::SEQUENCE_IDS_META, $sequence_id, false );
-		}
+		update_post_meta( $id, self::SEQUENCE_IDS_META, $course->get_sequence_ids() );
 	}
 
+	/**
+	 * Load information into a Course object.
+	 *
+	 * @param MK_Course $course The information gets set by reference into this Course.
+	 */
 	public static function load( &$course ) {
 		$id = $course->get_id();
 		if ( ! $id ) {
@@ -27,14 +36,20 @@ class MK_Courses {
 		$post = get_post( $id );
 		$course->set_name( $post->post_title );
 		$course->set_description( $post->post_content );
-		$course->set_sequence_ids( get_post_meta( $id, self::SEQUENCE_IDS_META, false ) );
+		$course->set_sequence_ids( (array) get_post_meta( $id, self::SEQUENCE_IDS_META, true ) );
 	}
 
+	/**
+	 * Hook actions and filters.
+	 */
 	public static function init() {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
 	}
 
+	/**
+	 * Register the metaboxes.
+	 */
 	public static function register_metaboxes() {
     	add_meta_box( 
     		'mk-sequence',
@@ -44,24 +59,111 @@ class MK_Courses {
     	);
 	}
 
+	/**
+	 * Save the metaboxes.
+	 *
+	 * @param int $post_id
+	 */
 	public static function save_metaboxes( $post_id ) {
-		$course = new MK_Course( $post_id );
-
-		if ( ! isset( $_GET[ self::SEQUENCE_IDS_META ] ) ) {
+		if ( ! current_user_can( 'edit_post' ) ) {
 			return;
 		}
 
-		var_dump( $_GET[ self::SEQUENCE_IDS_META ] ); die(); //todo.
+		$course = new MK_Course( $post_id );
+
+		if ( ! isset( $_POST[ self::SEQUENCE_IDS_META ] ) ) {
+			return;
+		}
+
+		$ids = explode( ',', $_POST[ self::SEQUENCE_IDS_META ] );
+		$course->set_sequence_ids( $ids );
+		$course->save();
 	}
 
+	/**
+	 * Render the sequence metabox used for setting the order of Tests and Lessons in the Course.
+	 *
+	 * @param WP_Post $post
+	 */
 	public static function render_sequence_metabox( $post ) {
 		$course = new MK_Course( $post->ID );
 		$sequence_ids = $course->get_sequence_ids();
 
-		foreach ( $sequence_ids as $id ) {
-			echo $id . '<br/>'; //todo.
+		?>
+		<style>
+		.mk_sequence_order .sequence_item {
+			line-height: 1em;
+			padding-top: 1em;
+			padding-bottom: 1em;
+			margin-bottom: .5em;
+			border: 1px solid silver;
+			text-align: center;
+			width: 600px;
+			padding-left: 1em;
+			padding-right: 1em;
+			cursor: move;
 		}
-	}
 
+		.mk_sequence_order .sequence_item.lesson {
+			background-color: #d1eef5;
+		}
+
+		.mk_sequence_order .sequence_item.test {
+			background-color: #feffa6;
+		}
+		</style>
+
+		<div class="mk_sequence_order">
+			<?php 
+			foreach ( $sequence_ids as $id ) :
+				$post_type = get_post_type( $id );
+				if ( MK_Tests::POST_TYPE === $post_type ) :
+					$test = new MK_Test( $id );
+					$text = $test->get_title();
+					if ( $test->is_final_exam() ) :
+						$text = '(Final Exam) ' . $text;
+					endif;
+				elseif ( MK_Lessons::POST_TYPE === $post_type ) :
+					$lesson = new MK_Lesson( $id );
+					$text = $lesson->get_title();
+				else :
+					continue;
+				endif;
+
+				?><div class="sequence_item <?php echo esc_attr( $post_type ) ?>" data-id="<?php echo $id ?>"><?php
+					echo $text;
+				?></div><?php
+			endforeach;
+			?>
+		</div>
+
+		<input type="hidden" id="mk_sequence_input" name="<?php echo self::SEQUENCE_IDS_META ?>" value="<?php echo implode( ',', $sequence_ids ) ?>" />
+		<?php
+
+		add_action( 'admin_print_footer_scripts', function() {
+			?>
+			<script>
+				( function( $ ) {
+					var update_order = function() {
+						// 500ms to let sortable finish UI effects and stuff.
+						setTimeout( function() {
+							var $items = $( '.mk_sequence_order .sequence_item' );
+							var ids = [];
+
+							$items.each( function(){
+								ids.push( $( this ).data( 'id' ) );
+							} );
+
+							$( '#mk_sequence_input' ).val( ids.join() );
+						}, 500 );
+					}
+
+					$( '.mk_sequence_order' ).sortable();
+					$( '.mk_sequence_order .sequence_item' ).on( 'mouseup', update_order );
+				} )( jQuery );
+			</script>
+			<?php
+		} );
+	}
 }
 MK_Courses::init();

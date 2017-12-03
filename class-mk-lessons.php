@@ -1,12 +1,19 @@
 <?php
 
+/**
+ * Manages Lessons at a macro level.
+ */
 class MK_Lessons {
 
 	const POST_TYPE = 'lesson';
 	const RESOURCE_TITLE_META = 'mk_resource_title';
 	const RESOURCE_URL_META = 'mk_resource_url';
 
-	// Just save the meta because everything else is saved during normal post save.
+	/**
+	 * Save a Lesson. This only saves information that isn't managed automatically by WordPress.
+	 *
+	 * @param MK_Lesson $lesson
+	 */
 	public static function save( $lesson ) {
 		$id = $lesson->get_id();
 		if ( ! $id ) {
@@ -15,8 +22,21 @@ class MK_Lessons {
 
 		update_post_meta( $id, self::RESOURCE_TITLE_META, $lesson->get_resource_title() );
 		update_post_meta( $id, self::RESOURCE_URL_META, $lesson->get_resource_url() );
+
+		// Prevent recursion.
+		remove_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
+		wp_update_post( [
+			'ID' => $id,
+			'post_parent' => $lesson->get_course_id(),
+		] );
+		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
 	}
 
+	/**
+	 * Load information into a Lesson object.
+	 *
+	 * @param MK_Lesson $lesson The information gets set by reference into this Lesson.
+	 */
 	public static function load( &$lesson ) {
 		$id = $lesson->get_id();
 		if ( ! $id ) {
@@ -25,25 +45,23 @@ class MK_Lessons {
 
 		$post = get_post( $id );
 		$lesson->set_title( $post->post_title );
+		$lesson->set_course_id( $post->post_parent );
 		$lesson->set_description( $post->post_content );
 		$lesson->set_resource_title( get_post_meta( $id, self::RESOURCE_TITLE_META, true ) );
 		$lesson->set_resource_url( get_post_meta( $id, self::RESOURCE_URL_META, true ) );
 	}
 
-	public static function get_parent_course_id( $lesson_id ) {
-		global $wpdb;
-
-		$query = $wpdb->prepare( "SELECT post_id FROM $wpdb->postmeta WHERE meta_value=%d AND meta_key=%s LIMIT 1", $lesson_id, MK_Courses::SEQUENCE_IDS_META );
-		$parent = $wpdb->get_var( $query );
-
-		return $parent ? absint( $parent ) : 0;
-	}
-
+	/**
+	 * Hook actions and filters.
+	 */
 	public static function init() {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
 	}
 
+	/**
+	 * Register the metaboxes.
+	 */
 	public static function register_metaboxes() {
     	add_meta_box( 
     		'mk-course-select',
@@ -59,10 +77,18 @@ class MK_Lessons {
     		[ __CLASS__, 'render_resource_metabox' ], 
     		self::POST_TYPE
     	);
-
 	}
 
+	/**
+	 * Save the metaboxes.
+	 *
+	 * @param int $post_id
+	 */
 	public static function save_metaboxes( $post_id ) {
+		if ( ! current_user_can( 'edit_post' ) ) {
+			return;
+		}
+
 		$lesson = new MK_Lesson( $post_id );
 
 		if ( isset( $_POST[ self::RESOURCE_URL_META ] ) ) {
@@ -73,10 +99,11 @@ class MK_Lessons {
 			$lesson->set_resource_title( $_POST[ self::RESOURCE_TITLE_META ] );
 		}
 
-		if ( isset( $_POST[ 'mk_parent_course' ] ) ) {
+		if ( isset( $_POST['mk_parent_course'] ) ) {
+			$old_course_id = $lesson->get_course_id();
+			$lesson->set_course_id( $_POST['mk_parent_course'] );
 
 			// Remove from old course.
-			$old_course_id = self::get_parent_course_id( $post_id );
 			if ( $old_course_id && absint( $_POST[ 'mk_parent_course' ] ) !== $old_course_id ) {
 				$old_course = new MK_Course( $old_course_id );
 				$old_course_ids = $old_course->get_sequence_ids();
@@ -105,15 +132,20 @@ class MK_Lessons {
 		$lesson->save();
 	}
 
+	/**
+	 * Render the Course Select metabox.
+	 *
+	 * @param WP_Post $post
+	 */
 	public static function render_course_select_metabox( $post ) {
 		$all_courses = get_posts( [ 
 			'posts_per_page' => -1,
 			'post_type' => MK_Courses::POST_TYPE,
 		] );
-		$selected = self::get_parent_course_id( $post->ID );
+		$selected = $post->post_parent;
 		?>
 		<select name="mk_parent_course">
-			<option <?php selected( $course_post->ID, $selected ) ?> value="0">Unassigned</option>
+			<option <?php selected( 0, $selected ) ?> value="0">Unassigned</option>
 			<?php foreach ( $all_courses as $course_post ): ?>
 				<option <?php selected( $course_post->ID, $selected ) ?> value="<?php echo $course_post->ID ?>"><?php echo esc_html( $course_post->post_title ) ?></option>
 			<?php endforeach ?>
@@ -121,6 +153,11 @@ class MK_Lessons {
 		<?php
 	}
 
+	/**
+	 * Render the lesson resource metabox.
+	 *
+	 * @param WP_Post $post
+	 */
 	public static function render_resource_metabox( $post ) {
 		$lesson = new MK_Lesson( $post->ID );
 		?>
@@ -130,6 +167,5 @@ class MK_Lessons {
 		<input type="text" name="<?php echo self::RESOURCE_URL_META ?>" value="<?php echo esc_url( $lesson->get_resource_url() ) ?>" style="width: 600px; margin-left: 2em" /><br />
 		<?php
 	}
-
 }
 MK_Lessons::init();

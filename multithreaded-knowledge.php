@@ -2,7 +2,7 @@
 /*
 Plugin Name: Multithreaded Knowledge
 Plugin URI: Multithreaded.Link
-Description: Learn by browsing the internet.
+Description: A decentralized learning platform powered by all the information already on the internet.
 Version: 1.0
 Author: Multithreaded.Link
 License: GPL2
@@ -21,6 +21,9 @@ GNU General Public License for more details.
 For license, see https://www.gnu.org/licenses/gpl-2.0.html.
  */
 
+/**
+ * Get the party started.
+ */
 function mk_init() {
 
 	mk_register_post_types();
@@ -30,11 +33,14 @@ function mk_init() {
 	require __DIR__ . '/class-mk-courses.php';
 	require __DIR__ . '/class-mk-lesson.php';
 	require __DIR__ . '/class-mk-lessons.php';
-
-
+	require __DIR__ . '/class-mk-test.php';
+	require __DIR__ . '/class-mk-tests.php';
 }
 add_action( 'init', 'mk_init' );
 
+/**
+ * Register the Course, Lesson, and Test post types.
+ */
 function mk_register_post_types() {
 	register_post_type( 'course', [
 		'labels' => [
@@ -126,6 +132,9 @@ function mk_register_post_types() {
 	] );
 }
 
+/**
+ * Register the Subject taxonomy.
+ */
 function mk_register_taxonomies() { 
     $args = array(
         'hierarchical' => false,
