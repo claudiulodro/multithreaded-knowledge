@@ -1,2 +1,2 @@
 # multithreaded-knowledge
-A WordPress plugin for learning platforms powered by browsing the internet.
+A decentralized education platform powered by all the information already on the internet.
