@@ -58,6 +58,7 @@ class MK_Tests {
 	public static function init() {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
+		add_filter( 'the_content', array( __CLASS__, 'render_test' ) );
 	}
 
 	/**
@@ -188,8 +189,8 @@ class MK_Tests {
 		.mk-question-input .incorrect input {
 			background-color: #ffd1d1;
 		}
-
 		</style>
+
 		<?php for ( $i = 0; $i < self::MAX_NUM_QUESTIONS; ++$i ):
 			$text = isset( $questions[ $i ], $questions[ $i ]['text'] ) ? esc_attr( $questions[ $i ]['text'] ) : '';
 			$correct = isset( $questions[ $i ], $questions[ $i ]['correct'] ) ? esc_attr( $questions[ $i ]['correct'] ) : '';
@@ -230,6 +231,225 @@ class MK_Tests {
 		This is a final exam. <br /><br />
 		<em>Final exams are required to complete a course and will also pull in questions randomly from other tests in the same course.</em>
 		<?php
+	}
+
+	/**
+	 * Make a Test as the content.
+	 *
+	 * @param string $content
+	 * @return string
+	 */
+	public static function render_test( $content ) {
+		$id = get_the_ID();
+		if ( self::POST_TYPE !== get_post_type( $id ) ) {
+			return $content;
+		}
+
+		remove_filter( 'the_content', [ __CLASS__, 'render_test' ] );
+		$test = new MK_Test( $id );
+		ob_start();
+		include __DIR__ . '/templates/test.php';
+		return ob_get_clean();
+	}
+
+	/**
+	 * Get random questions from other tests in the same Course.
+	 *
+	 * @param MK_Test $test
+	 * @param int $amount Max # of questions to get.
+	 * @return array of question arrays
+	 */
+	public static function get_random_questions_not_from_test( $test, $amount = 20 ) {
+		$test_posts = get_posts( [
+			'post__not_in' => [ $test->get_id() ],
+			'post_status' => 'publish',
+			'post_type' => self::POST_TYPE,
+			'post_parent' => $test->get_course_id(),
+			'posts_per_page' => -1,
+		] );
+
+		$question_pool = [];
+		foreach ( $test_posts as $post ) {
+			$test = new MK_Test( $post->ID );
+			$questions = $test->get_questions();
+			$question_pool = array_merge( $question_pool, $questions );
+		}
+
+		shuffle( $question_pool );
+		return array_slice( $question_pool, 0, $amount );
+	}
+
+	/**
+	 * Get randomized questions ready for being used in a Test.
+	 *
+	 * @param MK_Test Test to get questions for.
+	 * @return array of question arrays
+	 */
+	public static function get_prepared_questions( $test ) {
+		$questions = $test->get_questions();
+		foreach ( $questions as $question ) {
+			$question['parent'] = $test->get_id();
+		}
+
+		if ( $test->is_final_exam() ) {
+			$random = self::get_random_questions_not_from_test( $test );
+			$questions = array_merge( $questions, $random );
+		}
+
+		shuffle( $questions );
+		foreach ( $questions as &$question ) {
+			$options = $question['incorrect'];
+			$options[] = $question['correct'];
+			shuffle( $options );
+			$question['options'] = $options;
+		}
+		return $questions;
+	}
+
+	/***
+	 * Get the test rubric.
+	 *
+	 * @param MK_Test $test
+	 * @param array $answers Submitted answer form
+	 * @return array of this format:
+			$rubric = [
+				'score' => [
+					'correct' : 5,
+					'incorrect' : 3,
+				],
+				'questions' => [
+					[
+						'text' => '',
+						'correct' => '',
+						'incorrect' => ['','',''],
+						'response' => '',
+						'options' => ['','','',''],
+						'parent' => 12, 
+					]
+				],
+			];
+	 */
+	public static function get_rubric( $test, $answers = [] ) {
+		if ( empty( $answers ) ) {
+			return [
+				'score' => [],
+				'questions' => self::get_prepared_questions( $test ),
+			];
+		}
+
+		return self::score_test( $answers );
+	}
+
+	/**
+	 * Convert an answer form to a graded rubric.
+	 *
+	 * @param array $answers Answer form.
+	 * @return array See get_rubric for format.
+	 */
+	public static function score_test( $answers ) {
+		$test_cache = [];
+		$correct = 0;
+		$total = 0;
+
+		$rubric = [
+			'questions' => [],
+		];
+
+		foreach ( $answers as $test_id => $answer ) {
+			if ( ! isset( $test_cache[ $test_id ] ) ) {
+				$test_cache[ $test_id ] = new MK_Test( $test_id );
+			}
+
+			foreach ( $answer as $question_text => $answer_details ) {
+				$test_questions = $test_cache[ $test_id ]->get_questions();
+
+				foreach ( $test_questions as $test_question ) {
+					if ( esc_attr( $question_text ) === esc_attr( $test_question['text'] ) ) {
+						$rubric['questions'][] = [
+							'text' => esc_attr( $question_text ),
+							'correct' => $test_question['correct'],
+							'incorrect' => $test_question['incorrect'],
+							'response' => esc_attr( $answer_details['response'] ),
+							'options' => $answer_details['options'],
+							'parent' => $test_cache[ $test_id ]->get_id(),
+						];
+						if ( esc_attr( $answer_details['response'] ) === esc_attr( $test_question['correct'] ) ) {
+							++$correct;
+						}
+						++$total;
+						break;
+					}
+				}
+			}
+		}
+
+		$rubric['score'] = [
+			'correct' => $correct,
+			'num_questions' => $total, 
+		];
+
+		return $rubric;
+	}
+
+	/**
+	 * Output a radio button for a test question option.
+	 *
+	 * @param int $option_index array index of option in question.
+	 * @param int $question_index array index of question in rubric.
+	 * @param array $rubric A test rubric.
+	 */
+	public static function radio( $option_index, $question_index, $rubric ) {
+		$question = $rubric['questions'][ $question_index ];
+		$option = $question['options'][ $option_index ];
+		$attr = '';
+		$class = '';
+
+		if ( ! empty( $rubric['score'] ) ) {
+			$attr .= 'disabled ';
+			if ( esc_attr( $question['response'] ) === esc_attr( $option ) ) {
+				$attr .= 'checked ';
+
+				if ( esc_attr( $question['correct'] ) !== esc_attr( $option ) ) {
+					$class = 'incorrect';
+				}
+			}
+
+			// Correct answer.
+			if ( esc_attr( $question['correct'] ) === esc_attr( $option ) ) {
+				$class = 'correct';
+
+			// All wrong answers when nothing is answered.
+			} elseif ( empty ( $question['response'] ) ) {
+				$class = 'incorrect';
+			}
+		}
+
+		?>
+		<div class="test_option <?php echo $class ?>">
+			<input type="hidden" 
+				name="answers[<?php echo intval( $question['parent'] ) ?>][<?php echo esc_attr( $question['text'] ) ?>][options][]" 
+				value="<?php echo esc_attr( $option ) ?>" />
+
+			<input type="radio" 
+				<?php echo $attr ?>
+				name="answers[<?php echo intval( $question['parent'] ) ?>][<?php echo esc_attr( $question['text'] ) ?>][response]" 
+				value="<?php echo esc_attr( $option ) ?>">
+
+			<?php echo esc_html( $option ) ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Output the test results score.
+	 *
+	 * @param int $correct The number of questions correct.
+	 * @param int $total The total number of questions.
+	 */
+	public static function output_score( $correct, $total ) {
+		$percent = $total ? round( ( $correct / $total ) * 100 ) : 0;
+
+		?>You got <?php echo (int) $correct ?> of <?php echo (int) $total ?> questions correct for a score of <?php echo $percent ?>%!<?php
 	}
 }
 MK_Tests::init();

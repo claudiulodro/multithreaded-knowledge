@@ -45,6 +45,8 @@ class MK_Courses {
 	public static function init() {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
+		add_filter( 'the_content', array( __CLASS__, 'render_course' ) );
+		add_shortcode( 'courses', array( __CLASS__, 'courses_shortcode' ) );
 	}
 
 	/**
@@ -129,10 +131,11 @@ class MK_Courses {
 				else :
 					continue;
 				endif;
-
-				?><div class="sequence_item <?php echo esc_attr( $post_type ) ?>" data-id="<?php echo $id ?>"><?php
-					echo $text;
-				?></div><?php
+				?>
+				<div class="sequence_item <?php echo esc_attr( $post_type ) ?>" data-id="<?php echo $id ?>">
+					<?php echo $text ?>
+				</div>
+				<?php
 			endforeach;
 			?>
 		</div>
@@ -164,6 +167,67 @@ class MK_Courses {
 			</script>
 			<?php
 		} );
+	}
+
+	/**
+	 * Render the Course in the content.
+	 *
+	 * @param string $content
+	 * @return string
+	 */
+	public static function render_course( $content ) {
+		$id = get_the_ID();
+		if ( self::POST_TYPE !== get_post_type( $id ) ) {
+			return $content;
+		}
+
+		remove_filter( 'the_content', [ __CLASS__, 'render_course' ] );
+		$course = new MK_Course( $id );
+		ob_start();
+		include __DIR__ . '/templates/course.php';
+		return ob_get_clean();
+	}
+
+	/**
+	 * Handle the courses shortcode.
+	 *
+	 * @param array $atts
+	 * @return string
+	 */
+	public static function courses_shortcode( $atts ) {
+		$atts = shortcode_atts( [
+			'subject' => '',
+		], $atts );
+
+		$args = [
+			'post_type' => self::POST_TYPE,
+			'posts_per_page' => -1,
+			'orderby' => 'title',
+			'order' => 'ASC',
+		];
+
+		$subject = sanitize_title( $atts['subject'] );
+		if ( $subject ) {
+			$args['tax_query'] = [
+				[
+					'taxonomy' => 'subject',
+					'field' => 'slug',
+					'terms' => $subject,
+				]
+			];
+		}
+
+		$courses = get_posts( $args );
+		ob_start();
+		?>
+		<ul class="mk_course_list">
+			<?php foreach ( $courses as $course ): ?>
+				<li><a href="<?php the_permalink( $course->ID ) ?>"><?php echo esc_html( $course->post_title ) ?></a></li>
+			<?php endforeach ?>
+		</ul>
+		<?php
+
+		return ob_get_clean();
 	}
 }
 MK_Courses::init();

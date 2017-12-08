@@ -2,7 +2,7 @@
 /*
 Plugin Name: Multithreaded Knowledge
 Plugin URI: Multithreaded.Link
-Description: A decentralized learning platform powered by all the information already on the internet.
+Description: A decentralized education platform powered by all the information already on the internet.
 Version: 1.0
 Author: Multithreaded.Link
 License: GPL2
@@ -37,6 +37,8 @@ function mk_init() {
 	require __DIR__ . '/class-mk-tests.php';
 }
 add_action( 'init', 'mk_init' );
+
+require __DIR__ . '/class-mk-courses-widget.php';
 
 /**
  * Register the Course, Lesson, and Test post types.

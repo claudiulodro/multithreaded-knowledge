@@ -93,7 +93,7 @@ class MK_Test {
 	 * @return string
 	 */
 	public function get_description() {
-		return $this->description;
+		return apply_filters( 'the_content', $this->description );
 	}
 
 	/**
@@ -127,6 +127,7 @@ class MK_Test {
 				'text' => $text,
 				'correct' => $correct,
 				'incorrect' => $incorrect,
+				'parent' => $this->get_id(),
 			];
 		}
 
