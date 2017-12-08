@@ -449,7 +449,16 @@ class MK_Tests {
 	public static function output_score( $correct, $total ) {
 		$percent = $total ? round( ( $correct / $total ) * 100 ) : 0;
 
-		?>You got <?php echo (int) $correct ?> of <?php echo (int) $total ?> questions correct for a score of <?php echo $percent ?>%!<?php
+
+		if ( $correct === $total ) {
+			$message = 'You got them all correct! 100% Good job!';
+		} elseif ( $percent > 70 ) {
+			$message = sprintf( 'You got %d correct of %d questions for a score of %d!', $correct, $total, $percent );
+		} else {
+			$message = sprintf( 'You only got %d correct of %d questions for a score of %d. Review the lessons then try again.', $correct, $total, $percent );
+		}
+
+		echo $message;
 	}
 }
 MK_Tests::init();
