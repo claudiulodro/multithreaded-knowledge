@@ -453,9 +453,9 @@ class MK_Tests {
 		if ( $correct === $total ) {
 			$message = 'You got them all correct! 100% Good job!';
 		} elseif ( $percent > 70 ) {
-			$message = sprintf( 'You got %d correct of %d questions for a score of %d!', $correct, $total, $percent );
+			$message = sprintf( 'You got %d correct of %d questions for a score of %d%%!', $correct, $total, $percent );
 		} else {
-			$message = sprintf( 'You only got %d correct of %d questions for a score of %d. Review the lessons then try again.', $correct, $total, $percent );
+			$message = sprintf( 'You only got %d correct of %d questions for a score of %d%%. Review the lessons then try again.', $correct, $total, $percent );
 		}
 
 		echo $message;
