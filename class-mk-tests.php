@@ -435,12 +435,14 @@ class MK_Tests {
 				name="answers[<?php echo intval( $question['parent'] ) ?>][<?php echo esc_attr( $question['text'] ) ?>][options][]" 
 				value="<?php echo esc_attr( $option ) ?>" />
 
-			<input type="radio" 
-				<?php echo $attr ?>
-				name="answers[<?php echo intval( $question['parent'] ) ?>][<?php echo esc_attr( $question['text'] ) ?>][response]" 
-				value="<?php echo esc_attr( $option ) ?>">
+			<label>
+				<input type="radio" 
+					<?php echo $attr ?>
+					name="answers[<?php echo intval( $question['parent'] ) ?>][<?php echo esc_attr( $question['text'] ) ?>][response]" 
+					value="<?php echo esc_attr( $option ) ?>">
 
-			<?php echo esc_html( $option ) ?>
+				<?php echo esc_html( $option ) ?>
+			</label>
 		</div>
 		<?php
 	}
