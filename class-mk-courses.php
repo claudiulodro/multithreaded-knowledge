@@ -45,8 +45,8 @@ class MK_Courses {
 	public static function init() {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
-		add_filter( 'the_content', array( __CLASS__, 'render_course' ) );
-		add_shortcode( 'courses', array( __CLASS__, 'courses_shortcode' ) );
+		add_filter( 'the_content', [ __CLASS__, 'render_course' ], 99 );
+		add_shortcode( 'courses', [ __CLASS__, 'courses_shortcode' ] );
 	}
 
 	/**
@@ -176,16 +176,19 @@ class MK_Courses {
 	 * @return string
 	 */
 	public static function render_course( $content ) {
+		global $post;
 		$id = get_the_ID();
 		if ( self::POST_TYPE !== get_post_type( $id ) ) {
 			return $content;
 		}
 
-		remove_filter( 'the_content', [ __CLASS__, 'render_course' ] );
+		remove_all_filters( 'the_content' );
 		$course = new MK_Course( $id );
 		ob_start();
 		include __DIR__ . '/templates/course.php';
-		return ob_get_clean();
+		$content = ob_get_clean();
+		$post->post_content = $content;
+		return $content;
 	}
 
 	/**

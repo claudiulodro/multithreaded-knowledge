@@ -57,8 +57,8 @@ class MK_Tests {
 	 */
 	public static function init() {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
-		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
-		add_filter( 'the_content', array( __CLASS__, 'render_test' ) );
+		add_action( 'save_post_' . self::POST_TYPE, [ __CLASS__, 'save_metaboxes' ] );
+		add_filter( 'the_content', [ __CLASS__, 'render_test' ], 99 );
 	}
 
 	/**
@@ -240,16 +240,21 @@ class MK_Tests {
 	 * @return string
 	 */
 	public static function render_test( $content ) {
+		global $post;
+
 		$id = get_the_ID();
 		if ( self::POST_TYPE !== get_post_type( $id ) ) {
 			return $content;
 		}
 
+		remove_all_filters( 'the_content' );
 		remove_filter( 'the_content', [ __CLASS__, 'render_test' ] );
 		$test = new MK_Test( $id );
 		ob_start();
 		include __DIR__ . '/templates/test.php';
-		return ob_get_clean();
+		$content = ob_get_clean();
+		$post->post_content = $content;
+		return $content;
 	}
 
 	/**
