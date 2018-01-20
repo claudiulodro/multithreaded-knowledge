@@ -114,14 +114,7 @@ class MK_Test {
 			}
 
 			$correct = isset( $question['correct'] ) ? esc_attr( $question['correct'] ) : '';
-			if ( ! $correct ) {
-				continue;
-			}
-
 			$incorrect = isset( $question['incorrect'] ) ? array_map( 'esc_attr', $question['incorrect'] ) : array();
-			if ( empty( $incorrect ) ) {
-				continue;
-			}
 
 			$sanitized[] = [
 				'text' => $text,
