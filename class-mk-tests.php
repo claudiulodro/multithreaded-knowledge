@@ -59,6 +59,8 @@ class MK_Tests {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, [ __CLASS__, 'save_metaboxes' ] );
 		add_filter( 'the_content', [ __CLASS__, 'render_test' ], 99 );
+		add_action( 'manage_' . self::POST_TYPE . '_posts_columns', [ __CLASS__, 'add_course_admin_column' ] );
+		add_action( 'manage_posts_custom_column', [ __CLASS__, 'render_course_admin_column' ], 10, 2 );
 	}
 
 	/**
@@ -233,6 +235,42 @@ class MK_Tests {
 		<em>Final exams are required to complete a course and will also pull in questions randomly from other tests in the same course.</em>
 		<?php
 	}
+
+	/**
+	 * Add a column to the Tests screen with info about parent Course.
+	 *
+	 * @param array $columns
+	 * @return array
+	 */
+	public static function add_course_admin_column( $columns ) {
+		$columns['course'] = 'Course';
+		return $columns;
+	}
+
+	/**
+	 * Populate column on Lessons screen with info about parent Course.
+	 *
+	 * @param string $column
+	 * @param int $post_id
+	 */
+	public static function render_course_admin_column( $column, $post_id ) {
+		if ( 'course' !== $column || self::POST_TYPE !== get_post_type( $post_id ) ) {
+			return;
+		}
+
+		$test = new MK_Test( $post_id );
+		$course_id = $test->get_course_id();
+		if ( ! $course_id ) {
+			return;
+		}
+
+		$course_link = get_edit_post_link( $course_id );
+		$course_title = get_the_title( $course_id );
+		?>
+		<a href="<?php echo $course_link ?>"><?php echo $course_title ?></a>
+		<?php
+	}
+
 
 	/**
 	 * Make a Test as the content.

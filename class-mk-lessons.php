@@ -55,9 +55,11 @@ class MK_Lessons {
 	 * Hook actions and filters.
 	 */
 	public static function init() {
-		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
-		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
-		add_action( 'wp', array( __CLASS__, 'redirect_singles_to_parent_course' ), 99 );
+		add_action( 'add_meta_boxes', [ __CLASS__, 'register_metaboxes' ] );
+		add_action( 'save_post_' . self::POST_TYPE, [ __CLASS__, 'save_metaboxes' ] );
+		add_action( 'wp', [ __CLASS__, 'redirect_singles_to_parent_course' ], 99 );
+		add_action( 'manage_' . self::POST_TYPE . '_posts_columns', [ __CLASS__, 'add_course_admin_column' ] );
+		add_action( 'manage_posts_custom_column', [ __CLASS__, 'render_course_admin_column' ], 10, 2 );
 	}
 
 	/**
@@ -167,6 +169,41 @@ class MK_Lessons {
 		<input type="text" name="<?php echo self::RESOURCE_TITLE_META ?>" value="<?php echo esc_attr( $lesson->get_resource_title() ) ?>" style="width: 600px; margin-left: 2em"/><br />
 		Resource URL 
 		<input type="text" name="<?php echo self::RESOURCE_URL_META ?>" value="<?php echo esc_url( $lesson->get_resource_url() ) ?>" style="width: 600px; margin-left: 2em" /><br />
+		<?php
+	}
+
+	/**
+	 * Add a column to the Lessons screen with info about parent Course.
+	 *
+	 * @param array $columns
+	 * @return array
+	 */
+	public static function add_course_admin_column( $columns ) {
+		$columns['course'] = 'Course';
+		return $columns;
+	}
+
+	/**
+	 * Populate column on Lessons screen with info about parent Course.
+	 *
+	 * @param string $column
+	 * @param int $post_id
+	 */
+	public static function render_course_admin_column( $column, $post_id ) {
+		if ( 'course' !== $column || self::POST_TYPE !== get_post_type( $post_id ) ) {
+			return;
+		}
+
+		$lesson = new MK_Lesson( $post_id );
+		$course_id = $lesson->get_course_id();
+		if ( ! $course_id ) {
+			return;
+		}
+
+		$course_link = get_edit_post_link( $course_id );
+		$course_title = get_the_title( $course_id );
+		?>
+		<a href="<?php echo $course_link ?>"><?php echo $course_title ?></a>
 		<?php
 	}
 
