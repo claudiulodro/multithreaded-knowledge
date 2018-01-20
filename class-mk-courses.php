@@ -207,6 +207,7 @@ class MK_Courses {
 			'posts_per_page' => -1,
 			'orderby' => 'title',
 			'order' => 'ASC',
+			'post_status' => 'publish',
 		];
 
 		$subject = sanitize_title( $atts['subject'] );

@@ -151,6 +151,7 @@ class MK_Tests {
 		$all_courses = get_posts( [ 
 			'posts_per_page' => -1,
 			'post_type' => MK_Courses::POST_TYPE,
+			'post_status' => [ 'publish', 'draft' ],
 		] );
 		$selected = $post->post_parent;
 		?>
