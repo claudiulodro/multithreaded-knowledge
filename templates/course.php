@@ -77,6 +77,7 @@ $unit_number = 1;
 				$lesson = new MK_Lesson( $item_id );
 				?>
 				<div class="sequence_item lesson">
+					<a name="<?php echo sanitize_title( $lesson->get_title() ) ?>"></a>
 					<div class="heading">
 						Unit <?php echo $unit_number ?>
 					</div>

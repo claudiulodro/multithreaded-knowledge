@@ -57,6 +57,7 @@ class MK_Lessons {
 	public static function init() {
 		add_action( 'add_meta_boxes',[ __CLASS__, 'register_metaboxes' ] );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_metaboxes' ) );
+		add_action( 'wp', array( __CLASS__, 'redirect_singles_to_parent_course' ), 99 );
 	}
 
 	/**
@@ -166,6 +167,19 @@ class MK_Lessons {
 		Resource URL 
 		<input type="text" name="<?php echo self::RESOURCE_URL_META ?>" value="<?php echo esc_url( $lesson->get_resource_url() ) ?>" style="width: 600px; margin-left: 2em" /><br />
 		<?php
+	}
+
+	/**
+	 * Redirect lessons to the parent course if a user tries to access the lesson directly.
+	 */
+	public static function redirect_singles_to_parent_course() {
+		if ( is_single() && self::POST_TYPE === get_post_type() ) {
+			$lesson = new MK_Lesson( get_the_ID() );
+			if ( $lesson->get_course_id() ) {
+				wp_safe_redirect( get_permalink( $lesson->get_course_id() ) . '#' . sanitize_title( $lesson->get_title() ), 301 );
+				exit;
+			}
+		}
 	}
 }
 MK_Lessons::init();
